@@ -1,9 +1,9 @@
 access(all) contract MultiSign {
-    
     pub var requiredVotesToPass : Int
     pub var eligibleToVote: {Address: Bool}
     pub var proposals: {String:Proposal}
-    
+    pub var voteExpireDuration: UFix64
+
     pub resource RemoteControl{
         pub fun createProposal(name: String, code: String){
             if !MultiSign.eligibleToVote[self.owner!.address]!{
@@ -64,10 +64,8 @@ access(all) contract MultiSign {
                 var trampoline = "pub contract Trampoline{\n pub fun execute(){\n if self.account.load<Bool>(from: /storage/shouldRun)!=nil{\n"
                 trampoline = trampoline.concat(self.name)
                 trampoline = trampoline.concat("(self.account)\n} \n}  \n}")
-
                 MultiSign.account.contracts.update__experimental(name: "Transactions", code: self.code.utf8)
                 MultiSign.account.contracts.update__experimental(name: "Trampoline", code: trampoline.utf8)
-                
                 MultiSign.account.save(true, to: /storage/shouldRun)
             }
         }
@@ -75,7 +73,7 @@ access(all) contract MultiSign {
 
     access(contract) fun deleteProposal(proposalID: String) {
         var proposal = self.proposals[proposalID]!
-        if proposal.finished || getCurrentBlock().timestamp - proposal.created_at > 1440.0 * 60.0 * 7.0 { //7 days 
+        if proposal.finished || getCurrentBlock().timestamp - proposal.created_at > Multisign.voteExpireDuration{ 
             self.proposals.remove(key: proposalID)
         }
     }
@@ -92,13 +90,11 @@ access(all) contract MultiSign {
     init(){
         self.proposals = {}
         self.requiredVotesToPass = 1
+        self.voteExpireDuration = UFix64( 1440.0 * 60.0 * 7.0 ) //7 days
         self.eligibleToVote = {
             0x73e4a1094d0bcab6: true //bluesign
         }
-        
         MultiSign.account.contracts.add(name: "Trampoline", code:  "pub contract Trampoline{}".utf8)
         MultiSign.account.contracts.add(name: "Transactions", code:  "pub contract Transactions{}".utf8)
-       
-        
     }
 }
