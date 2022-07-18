@@ -1,5 +1,5 @@
 access(all) contract MultiSign {
-    pub var requiredVotesToPass : Int
+    pub var requiredVotesToPass : UInt
     pub var eligibleToVote: {Address: Bool}
     pub var proposals: {String:Proposal}
     pub var voteExpireDuration: UFix64
@@ -87,14 +87,25 @@ access(all) contract MultiSign {
         self.proposals[proposalID]!.vote(voter: voter, proposalID: proposalID, vote: vote)
     }
 
-    init(){
+    access(account) fun setVoters(voters: {Address: Bool}}{
+        self.eligibleToVote = voters
+    }
+
+    init(voters: {Address: Bool}, requiredVotes: UInt){
         self.proposals = {}
-        self.requiredVotesToPass = 1
+        self.requiredVotesToPass = requiredVotes
         self.voteExpireDuration = UFix64( 1440.0 * 60.0 * 7.0 ) //7 days
-        self.eligibleToVote = {
-            0x73e4a1094d0bcab6: true //bluesign
-        }
+        self.eligibleToVote =  voters
         MultiSign.account.contracts.add(name: "Trampoline", code:  "pub contract Trampoline{}".utf8)
         MultiSign.account.contracts.add(name: "Transactions", code:  "pub contract Transactions{}".utf8)
+    }
+
+    pub fun deployTo(acc: AuthAccount, voters: {Address:Bool}, requiredVotes: UInt){
+        acc.contracts.add(
+            name: "MultiSign", 
+            code: self.account.contracts.get(name: "MultiSign")!.code, 
+            voters:{Address:Bool}, 
+            requiredVotes: requiredVotes
+        )
     }
 }
